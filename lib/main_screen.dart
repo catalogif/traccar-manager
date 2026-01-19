@@ -12,13 +12,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:traccar_manager/error_screen.dart';
-import 'package:traccar_manager/main.dart';
 import 'package:traccar_manager/token_store.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_android/shared_preferences_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 class MainScreen extends StatefulWidget {
@@ -29,12 +26,11 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  static const _urlKey = 'url';
+  static const String _serverUrl = 'https://server.atrack.com.pk/';
 
   final _initialized = Completer<void>();
   final _authenticated = Completer<void>();
 
-  late final SharedPreferencesWithCache _preferences;
   late final WebViewController _controller;
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _appLinksSubscription;
@@ -98,7 +94,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   String _getUrl() {
-    return _preferences.getString(_urlKey) ?? 'https://demo.traccar.org';
+    return _serverUrl;
   }
 
   bool _isDownloadable(Uri uri) {
@@ -133,13 +129,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _initWebView() async {
-    _preferences = await SharedPreferencesWithCache.create(
-      sharedPreferencesOptions: Platform.isAndroid
-        ? SharedPreferencesAsyncAndroidOptions(backend: SharedPreferencesAndroidBackendLibrary.SharedPreferences)
-        : SharedPreferencesOptions(),
-      cacheOptions: SharedPreferencesWithCacheOptions(allowList: {'url'}),
-    );
-
     String url = _getUrl();
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
@@ -299,10 +288,8 @@ class _MainScreenState extends State<MainScreen> {
           developer.log('Failed to save downloaded file', error: e);
         }
       case 'server':
-        final url = parts[1];
-        await _loginTokenStore.delete();
-        await _preferences.setString(_urlKey, url);
-        await _controller.loadRequest(Uri.parse(url));
+        // Server change is disabled - always use hardcoded server
+        developer.log('Server change request ignored - using hardcoded server');
     }
   }
 
@@ -322,11 +309,8 @@ class _MainScreenState extends State<MainScreen> {
     if (_loadingError != null) {
       return ErrorScreen(
         error: _loadingError!,
-        url: _getUrl(),
-        onUrlSubmitted: (url) async {
-          await _loginTokenStore.delete();
-          await _preferences.setString(_urlKey, url);
-          await _controller.loadRequest(Uri.parse(url));
+        onRetry: () async {
+          await _controller.reload();
           setState(() { _loadingError = null; });
         },
       );
